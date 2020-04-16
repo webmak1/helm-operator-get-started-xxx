@@ -1,166 +1,90 @@
 # Managing Helm releases the GitOps way
 
-**What is GitOps?**
 
-GitOps is a way to do Continuous Delivery, it works by using Git as a source of truth for declarative infrastructure and workloads.
-For Kubernetes this means using `git push` instead of `kubectl create/apply` or `helm install/upgrade`.
+<br/>
 
-In a traditional CICD pipeline, CD is an implementation extension powered by the
-continuous integration tooling to promote build artifacts to production.
-In the GitOps pipeline model, any change to production must be committed in source control
-(preferable via a pull request) prior to being applied on the cluster.
-This way rollback and audit logs are provided by Git.
-If the entire production state is under version control and described in a single Git repository, when disaster strikes,
-the whole infrastructure can be quickly restored from that repository.
+### Run in minikube
 
-To better understand the benefits of this approach to CD and what the differences between GitOps and
-Infrastructure-as-Code tools are, head to the Weaveworks website and read [GitOps - What you need to know](https://www.weave.works/technologies/gitops/) article.
-
-In order to apply the GitOps pipeline model to Kubernetes you need three things:
-
-* a Git repository with your workloads definitions in YAML format, Helm charts and any other Kubernetes custom resource that defines your cluster desired state (I will refer to this as the *config* repository)
-* a container registry where your CI system pushes immutable images (no *latest* tags, use *semantic versioning* or git *commit sha*)
-* an operator that runs in your cluster and does a two-way synchronization:
-    * watches the registry for new image releases and based on deployment policies updates the workload definitions with the new image tag and commits the changes to the config repository
-    * watches for changes in the config repository and applies them to your cluster
-
-I will be using GitHub to host the config repo, Docker Hub as the container registry and Flux as the GitOps Kubernetes Operator.
-
-![gitops](https://github.com/fluxcd/helm-operator-get-started/blob/master/diagrams/flux-helm-operator-registry.png)
-
-### Prerequisites
-
-You'll need a Kubernetes cluster v1.11 or newer, a GitHub account, git and kubectl installed locally.
-
-Install Helm v3 and fluxctl for macOS with Homebrew:
-
-```sh
-brew install helm fluxctl
-```
-
-On Windows you can use Chocolatey:
-
-```sh
-choco install kubernetes-helm fluxctl
-```
-
-On Linux you can download the [helm](https://github.com/helm/helm/releases)
-and [fluxctl](https://github.com/fluxcd/flux/releases) binaries from GitHub.
-
-### Install Flux
-
-The first step in automating Helm releases with [Flux](https://github.com/fluxcd/flux) is to create a Git repository with your charts source code.
-
-On GitHub, fork this repository and clone it locally
-(replace `fluxcd` with your GitHub username): 
-
-```sh
-git clone https://github.com/fluxcd/helm-operator-get-started
-cd helm-operator-get-started
-```
-
-*If you fork, update the release definitions with your Docker Hub repository and GitHub username located in
-\releases\(dev/stg/prod)\podinfo.yaml in your master branch before proceeding.
-
-Add FluxCD repository to Helm repos:
-
-```bash
-helm repo add fluxcd https://charts.fluxcd.io
-```
-
-Create the `fluxcd` namespace:
-
-```sh
-kubectl create ns fluxcd
-```
-
-Install Flux by specifying your fork URL (replace `fluxcd` with your GitHub username): 
-
-```bash
-helm upgrade -i flux fluxcd/flux --wait \
---namespace fluxcd \
---set git.url=git@github.com:fluxcd/helm-operator-get-started
-```
-
-Install the `HelmRelease` Kubernetes custom resource definition:
-
-```sh
-kubectl apply -f https://raw.githubusercontent.com/fluxcd/helm-operator/master/deploy/crds.yaml
-```
-
-Install Flux Helm Operator with ***Helm v3*** support:
-
-```bash
-helm upgrade -i helm-operator fluxcd/helm-operator --wait \
---namespace fluxcd \
---set git.ssh.secretName=flux-git-deploy \
---set helm.versions=v3
-```
-
-The Flux Helm operator provides an extension to Flux that automates Helm Chart releases for it.
-A Chart release is described through a Kubernetes custom resource named HelmRelease.
-The Flux daemon synchronizes these resources from git to the cluster,
-and the Flux Helm operator makes sure Helm charts are released as specified in the resources.
-
-Note that Flux Helm Operator works with Kubernetes 1.11 or newer.
-
-At startup, Flux generates a SSH key and logs the public key. Find the public key with:
-
-```bash
-fluxctl identity --k8s-fwd-ns fluxcd
-```
-
-In order to sync your cluster state with Git you need to copy the public key and
-create a **deploy key** with **write access** on your GitHub repository.
-
-Open GitHub, navigate to your fork, go to _Setting > Deploy keys_ click on _Add deploy key_, check
-_Allow write access_, paste the Flux public key and click _Add key_.
-
-### GitOps pipeline example
-
-The config repo has the following structure:
 
 ```
-├── charts
-│   └── podinfo
-│       ├── Chart.yaml
-│       ├── README.md
-│       ├── templates
-│       └── values.yaml
-├── hack
-│   ├── Dockerfile.ci
-│   └── ci-mock.sh
-├── namespaces
-│   ├── dev.yaml
-│   └── stg.yaml
-└── releases
-    ├── dev
-    │   └── podinfo.yaml
-    └── stg
-        └── podinfo.yaml
+$ {
+minikube --profile my-profile config set memory 4096
+minikube --profile my-profile config set cpus 2
+
+// $ minikube --profile my-profile config set vm-driver virtualbox
+minikube --profile my-profile config set vm-driver docker
+
+minikube --profile my-profile config set kubernetes-version v1.16.1
+minikube start --profile my-profile
+}
 ```
 
-I will be using [podinfo](https://github.com/stefanprodan/podinfo) to demonstrate a full CI/CD pipeline including promoting releases between environments.
+<br/>
 
-I'm assuming the following Git branching model:
-* dev branch (feature-ready state)
-* stg branch (release-candidate state)
-* master branch (production-ready state)
+    // To delete
+    // $ minikube --profile my-profile stop && minikube --profile my-profile delete
 
-When a PR is merged in the dev or stg branch will produce a immutable container image as in `repo/app:branch-commitsha`.
+<br/>
 
-Inside the *hack* dir you can find a script that simulates the CI process for dev and stg.
-The *ci-mock.sh* script does the following:
-* pulls the podinfo source code from GitHub
-* generates a random string and modifies the code
-* generates a random Git commit short SHA
-* builds a Docker image with the format: `yourname/podinfo:branch-sha`
-* pushes the image to Docker Hub
+    $ kubectl version --short
+    Client Version: v1.18.1
+    Server Version: v1.16.1
 
-Let's create an image corresponding to the `dev` branch (replace `stefanprodan` with your Docker Hub username):
+<br/>
+
+    // FluxCtl Installation
+    $ curl -sL https://fluxcd.io/install | sh && chmod +x $HOME/.fluxcd/bin/fluxctl && sudo mv $HOME/.fluxcd/bin/fluxctl /usr/local/bin/
+
+
+<br/>
+
+### With HELM3
+
+    $ helm repo add fluxcd https://charts.fluxcd.io
+    
+    $ kubectl create namespace fluxcd
+    
+    $ helm upgrade -i flux fluxcd/flux --wait \
+    --namespace fluxcd \
+    --set git.url=git@github.com:webmakaka/helm-operator-get-started \
+    --set git.timeout=3m \
+    --set git.pollInterval=1m \
+    --set resources.requests.cpu=500m \
+    --set resources.requests.memory=500Mi \
+    --set sync.timeout=3m \
+    --set helm.versions=v3
+
+
+    $ kubectl apply -f https://raw.githubusercontent.com/fluxcd/helm-operator/master/deploy/crds.yaml
+
+
+    $ helm upgrade -i helm-operator fluxcd/helm-operator --wait \
+    --namespace fluxcd \
+    --set git.ssh.secretName=flux-git-deploy \
+    --set helm.versions=v3
+    
+    $ watch kubectl -n fluxcd get pods
+    
+    $ fluxctl --k8s-fwd-ns fluxcd identity 
+     
+     GITHUB --> Project (flux-get-started) --> SETTINGS --> DELPLOY KEYS
+
+    + allow write access
+    
+<br/>
+
+    $ fluxctl --k8s-fwd-ns=fluxcd sync
+
+    $ kubectl -n fluxcd logs deployment/flux -f
+
+
+<br/>
+
 
 ```
-$ cd hack && ./ci-mock.sh -r stefanprodan/podinfo -b dev
+$ docker login
+$ cd hack 
+$ ./ci-mock.sh -r stefanprodan/podinfo -b dev
 
 Sending build context to Docker daemon  4.096kB
 Step 1/15 : FROM golang:1.13 as builder
@@ -455,3 +379,11 @@ If you have any questions about Helm Operator and continuous delivery:
 - [File an issue.](https://github.com/fluxcd/flux/issues/new)
 
 Your feedback is always welcome!
+
+
+
+---
+
+<strong>Marley</strong>
+
+<a href="https://webmakaka.com"><strong>WebMakaka</strong></a>
