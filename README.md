@@ -133,6 +133,4 @@ $ kubectl -n prod describe pod podinfo-prod-6d7bd6bc8-2dgzb | grep Image
 
 ---
 
-<strong>Marley</strong>
-
-<a href="https://webmakaka.com"><strong>WebMakaka</strong></a>
+<a href="https://marley.org"><strong>Marley</strong></a>
